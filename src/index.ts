@@ -1,6 +1,7 @@
 export * from "./Errors/index.js";
 export * from "./models/index.js";
 export * from "./zalo.js";
+export * from "./assistant/index.js";
 
 export type { ContextSession, ContextBase, AppContextExtended, AppContextBase, Options, ZPWServiceMap, ImageMetadataGetter,ImageMetadataGetterResponse } from "./context.js";
 
