@@ -103,7 +103,7 @@ v14 as well; preserving source alone does not restore the host's cached tools.
 
 ## Verified evidence
 
-### Native context repair candidate v17
+### Native context repair v18
 
 The Test AI real-photo probe returned completed HTTP200 callbacks but explicitly
 reported unavailable image content. Those probes failed vision acceptance.
@@ -113,12 +113,30 @@ the active image context. It keeps the v16 resource as an upgrade alias.
 The exact original-photo path and completed audit remain mandatory; do not use
 metadata or an old synthetic answer as a substitute for visible images.
 
-Local copied gateway suite on this candidate: 170 PASS, 0 FAIL/SKIP. Native live
-retest is pending; the earlier v16 synthetic PASS below does not certify v17.
+V17 local suite passed 170 tests, but its live three-image run returned empty
+rows and the four-photo Test AI probe still reported no visible images. Its
+one-image run only passed after a reminder. Those failures remain acceptance
+failures despite completed HTTP200 callbacks.
+
+V18 persists a new native request/lease before uploading files, so a render
+during upload restores the current request instead of publishing the old idle
+state. It restores modelContent as well as imageIds, avoids rewriting identical
+state on every poll, and orders file staging before the awaited host report and
+message dispatch. Regression coverage includes an observer during upload and
+dispatch held until that report completes.
+
+Copied gateway build and full suite: **172 PASS, 0 FAIL/SKIP**. Fresh randomized
+live one-image and three-image gates both PASS on v18, with exact content,
+grouping, image references and completed coworker-widget/chatgpt-web audits.
+Observed round trips: **28.6 s** and **35.1 s**. Sanitized synthetic evidence is
+retained in `evidence/2026-10-14T17-28-48.399Z-1-images.json` and
+`evidence/2026-10-14T17-30-46.112Z-3-images.json`.
 The owned v16 run was gracefully stopped with no pending/claimed/draining jobs,
 its evidence retained, and a separate copied v17 run was started. Installed
 gateway source/configuration was preserved. The worker still needs the new UI
-resource before native acceptance can be re-established.
+resource before testing. V18 has now been activated and its runtime heartbeat
+verified. The real four-photo semantic readback and group delivery are still
+required for Zalo acceptance.
 
 OpenAI documents `imageIds` as the files supplied to later model turns through
 [structured widget state](https://developers.openai.com/plugins/build/chatgpt-ui).

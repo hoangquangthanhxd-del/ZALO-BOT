@@ -17,7 +17,7 @@ test('native reminder preserves current uploaded image IDs after a widget rerend
   const states:unknown[]=[];
   const browser=createContext({crypto:{randomUUID},document:{getElementById:()=>({textContent:''})},setTimeout(){},clearTimeout(){},
     window:{openai:{widgetState:{modelContent:'current image job',imageIds:['file_current_1','file_current_2'],privateContent:{
-      version:'bridge-v17',widgetId:randomUUID(),activeRequest:requestId,leaseId:claimId,phase:'sent',activeNativeImageCount:2}},
+      version:'bridge-v18',widgetId:randomUUID(),activeRequest:requestId,leaseId:claimId,phase:'sent',activeNativeImageCount:2}},
       setWidgetState:(state:unknown)=>states.push(JSON.parse(JSON.stringify(state))),
       callTool:async()=>({structuredContent:{active_pending:true,delivery_permitted:true}}),sendFollowUpMessage:async()=>{}}}});
   new Script(script).runInContext(browser);
@@ -27,13 +27,64 @@ test('native reminder preserves current uploaded image IDs after a widget rerend
   assert.equal(new Script('nativeSends').runInContext(browser),1);
   assert.equal(new Script('textSends').runInContext(browser),0);
   assert.deepEqual((states.at(-1) as {imageIds:string[]}).imageIds,['file_current_1','file_current_2']);
+  assert.equal((states.at(-1) as {modelContent:string}).modelContent,'current image job');
+});
+
+test('new native lease survives a render during upload and stages files before host dispatch',async()=>{
+  const script=WIDGET_HTML.match(/<script>([\s\S]*?)<\/script>/)![1];
+  const requestId=randomUUID(),claimId=randomUUID();
+  const states:Record<string,unknown>[]=[];
+  let finishUpload!: (ids:string[])=>void, finishAck!:()=>void;
+  const upload=new Promise<string[]>(resolve=>{finishUpload=resolve;});
+  const ack=new Promise<void>(resolve=>{finishAck=resolve;});
+  const browser=createContext({crypto:{randomUUID},document:{getElementById:()=>({textContent:''})},setTimeout(){},clearTimeout(){},
+    upload, ack,
+    window:{openai:{setWidgetState:(state:Record<string,unknown>)=>states.push(JSON.parse(JSON.stringify(state))),
+      callTool:async(_name:string,args:Record<string,unknown>)=>{
+        if(args.delivery==='host_invoked')await ack;
+        return {structuredContent:args.active_request_id?{active_pending:true,delivery_permitted:true}:
+          {turn:{request_id:requestId,claim_lease_id:claimId,prompt:'new image request',delivery_state:'reserved',native_image_count:3}}};
+      },sendFollowUpMessage:async()=>{}}}});
+  new Script(script).runInContext(browser);
+  new Script("var nativeSends=0; uploadNativeRequestImages=async()=>upload; sendHostFileMessage=async()=>{nativeSends++;};").runInContext(browser);
+  const running=new Script('loop()').runInContext(browser);
+  for(let i=0;i<30;i++)await Promise.resolve();
+  const preparing=states.at(-1)!;
+  assert.equal((preparing.privateContent as {activeRequest:string}).activeRequest,requestId);
+  assert.equal((preparing.privateContent as {activeNativeImageCount:number}).activeNativeImageCount,3);
+  assert.deepEqual(preparing.imageIds,[]);
+  // The observer restores an active lease, so it cannot publish an idle state.
+  const observerStates:unknown[]=[];
+  const observer=createContext({crypto:{randomUUID},document:{getElementById:()=>({textContent:''})},setTimeout(){},clearTimeout(){},
+    window:{openai:{widgetState:preparing,setWidgetState:(value:unknown)=>observerStates.push(value)}}});
+  new Script(script).runInContext(observer);
+  assert.equal(observerStates.length,0);
+  finishUpload(['file_new_1','file_new_2','file_new_3']);
+  for(let i=0;i<30;i++)await Promise.resolve();
+  assert.deepEqual(states.at(-1)!.imageIds,['file_new_1','file_new_2','file_new_3']);
+  assert.equal(new Script('nativeSends').runInContext(browser),0);
+  finishAck();await running;
+  for(let i=0;i<30;i++)await Promise.resolve();
+  assert.equal(new Script('nativeSends').runInContext(browser),1);
+});
+
+test('unchanged widget polling does not repeatedly replace native model context',()=>{
+  const script=WIDGET_HTML.match(/<script>([\s\S]*?)<\/script>/)![1];
+  const states:unknown[]=[];
+  const browser=createContext({crypto:{randomUUID},document:{getElementById:()=>({textContent:''})},setTimeout(){},clearTimeout(){},
+    window:{openai:{widgetState:{modelContent:'current native request',imageIds:['file_current'],privateContent:{
+      version:'bridge-v18',widgetId:randomUUID(),activeRequest:randomUUID(),leaseId:randomUUID(),phase:'sent',activeNativeImageCount:1}},
+      setWidgetState:(state:unknown)=>states.push(state)}}});
+  new Script(script).runInContext(browser);
+  for(let i=0;i<10;i++)new Script('persist()').runInContext(browser);
+  assert.equal(states.length,1);
 });
 
 test('an observing render without uploaded IDs cannot clear a native request context',()=>{
   const script=WIDGET_HTML.match(/<script>([\s\S]*?)<\/script>/)![1];
   const states:unknown[]=[];
   const browser=createContext({crypto:{randomUUID},document:{getElementById:()=>({textContent:''})},setTimeout(){},clearTimeout(){},
-    window:{openai:{widgetState:{privateContent:{version:'bridge-v17',widgetId:randomUUID(),activeRequest:randomUUID(),leaseId:randomUUID(),phase:'sending',activeNativeImageCount:4}},
+    window:{openai:{widgetState:{privateContent:{version:'bridge-v18',widgetId:randomUUID(),activeRequest:randomUUID(),leaseId:randomUUID(),phase:'sending',activeNativeImageCount:4}},
       setWidgetState:(state:unknown)=>states.push(state)}}});
   new Script(script).runInContext(browser);
   new Script('persist()').runInContext(browser);
@@ -415,7 +466,7 @@ test(`widget ${transport} completes an Anthropic file tool loop through standalo
     assert.equal(bridge.pendingCount, 0);
     assert.ok(calls.every((name) => name === "workbench_api_poll"));
     assert.ok(bridge.snapshot().hostTransports[transport] > 0);
-    assert.equal(bridge.snapshot().runtime.last, "bridge-v17");
+    assert.equal(bridge.snapshot().runtime.last, "bridge-v18");
   } finally {
     bridge.shutdown();
     await client.close();

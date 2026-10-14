@@ -35,7 +35,7 @@ test("real MCP callbacks keep quiet notices separate from complete API text and 
     for (const name of ["workbench_api_activate", "workbench_api_submit"]) assert.ok(tools.tools.find(tool => tool.name === name)?.description?.includes(WIDGET_CHAT_POLICY));
     const activation = await client.callTool({ name: "workbench_api_activate", arguments: {} });
     selectedWidgetId = (activation.structuredContent as { widget_id: string }).widget_id;
-    assert.deepEqual(activation.structuredContent, { status: "opening", widget_runtime: "bridge-v17", widget_id: selectedWidgetId });
+    assert.deepEqual(activation.structuredContent, { status: "opening", widget_runtime: "bridge-v18", widget_id: selectedWidgetId });
     assert.match(textOf(activation), /Do not post setup narration or claim Thành công/);
     assert.ok(textOf(activation).includes(WIDGET_CHAT_POLICY));
     const unknown = await submit(randomUUID(), { text: "not delivered" });
