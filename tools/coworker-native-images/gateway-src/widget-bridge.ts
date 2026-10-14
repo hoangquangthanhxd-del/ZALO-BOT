@@ -51,7 +51,7 @@ export class WidgetBridge implements ChatGPTBridge {
       this.mcpDiagnostics.lastRequestedResource = typeof resourceUri === "string" && resourceUri.length <= 160
         && /^ui:\/\/[a-z0-9-]{1,40}\/[a-z0-9._/-]{1,110}\.html$/i.test(resourceUri)
         ? resourceUri : "redacted";
-      if (resourceUri !== "ui://coworkerapi/bridge-v18.html") this.mcpDiagnostics.legacyResourceReads++;
+      if (resourceUri !== "ui://coworkerapi/bridge-v21.html") this.mcpDiagnostics.legacyResourceReads++;
     } else this.mcpDiagnostics.other++;
   }
   recordActivation(): string {
@@ -66,7 +66,7 @@ export class WidgetBridge implements ChatGPTBridge {
   acceptsWidget(widgetId?: string): boolean { return this.selectedWidgetId === null || widgetId === this.selectedWidgetId; }
   recordResourceRead(uri: string): void {
     this.uiDiagnostics.resourceReads++;
-    this.uiDiagnostics.lastResource = uri === "ui://coworkerapi/bridge-v18.html" ? uri : "other";
+    this.uiDiagnostics.lastResource = uri === "ui://coworkerapi/bridge-v21.html" ? uri : "other";
   }
 
   get pendingCount(): number { return this.turns.size; }
@@ -76,7 +76,7 @@ export class WidgetBridge implements ChatGPTBridge {
   heartbeat(runtimeVersion?: string, widgetId?: string): void {
     if (!this.acceptsWidget(widgetId)) return;
     this.lastPollAt = Date.now();
-    this.lastRuntime = ["bridge-v3", "bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16", "bridge-v17", "bridge-v18"].includes(runtimeVersion ?? "") ? runtimeVersion! : null;
+    this.lastRuntime = ["bridge-v3", "bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16", "bridge-v17", "bridge-v18", "bridge-v19", "bridge-v20", "bridge-v21"].includes(runtimeVersion ?? "") ? runtimeVersion! : null;
     if (this.lastRuntime) this.runtimePolls.versioned++;
     else this.runtimePolls.unversioned++;
   }
@@ -183,7 +183,7 @@ export class WidgetBridge implements ChatGPTBridge {
     this.heartbeat(runtimeVersion, widgetId);
     this.pruneCancelled();
     this.recoverUnsentClaims();
-    const leasedRuntime = ["bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16", "bridge-v17", "bridge-v18"].includes(runtimeVersion ?? "");
+    const leasedRuntime = ["bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16", "bridge-v17", "bridge-v18", "bridge-v19", "bridge-v20", "bridge-v21"].includes(runtimeVersion ?? "");
     if (leasedRuntime && (!widgetId || !/^[a-f0-9-]{36}$/i.test(widgetId))) return null;
     if ([...this.cancelledTurns.values()].some((turn) => turn.drainUntil > Date.now())) return null;
     const owned = leasedRuntime ? [...this.turns.values()].find(t => t.claimed && t.lease?.owner === widgetId) : undefined;

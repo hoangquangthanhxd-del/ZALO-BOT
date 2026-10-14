@@ -49,18 +49,18 @@ test("standalone CoworkerAPI serves its own authenticated ChatGPT MCP widget", a
     const opened = await client.callTool({ name: "workbench_api_activate", arguments: {} });
     const widgetId = (opened.structuredContent as { widget_id: string }).widget_id;
     assert.match(widgetId, /^[a-f0-9-]{36}$/i);
-    assert.deepEqual(opened.structuredContent, { status: "opening", widget_runtime: "bridge-v18", widget_id: widgetId });
+    assert.deepEqual(opened.structuredContent, { status: "opening", widget_runtime: "bridge-v21", widget_id: widgetId });
     assert.equal(bridge.active, false, "Opening selects a worker but cannot fake its heartbeat");
     assert.equal(bridge.snapshot().ui.activations, 1);
     assert.equal(bridge.snapshot().ui.resourceReads, 1);
     const legacy = await client.readResource({ uri: "ui://coworkerapi/bridge-v1.html" });
     assert.ok("text" in legacy.contents[0]);
-    assert.match(legacy.contents[0].text, /runtime_version: 'bridge-v18'/);
+    assert.match(legacy.contents[0].text, /runtime_version: 'bridge-v21'/);
     assert.equal(bridge.snapshot().mcp.legacyResourceReads, 1);
     assert.ok(bridge.snapshot().mcp.toolsList >= 1);
     const migrated = await client.readResource({ uri: "ui://coworker/api-bridge-v3.html" });
     assert.ok("text" in migrated.contents[0]);
-    assert.match(migrated.contents[0].text, /runtime_version: 'bridge-v18'/);
+    assert.match(migrated.contents[0].text, /runtime_version: 'bridge-v21'/);
     assert.equal(bridge.snapshot().mcp.lastRequestedResource, "ui://coworker/api-bridge-v3.html");
     assert.equal(bridge.snapshot().ui.resourceReads, 3);
 

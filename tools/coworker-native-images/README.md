@@ -103,51 +103,48 @@ v14 as well; preserving source alone does not restore the host's cached tools.
 
 ## Verified evidence
 
-### Native context repair v18
+### Native context and message repair v21
 
-The Test AI real-photo probe returned completed HTTP200 callbacks but explicitly
-reported unavailable image content. Those probes failed vision acceptance.
-The v17 candidate preserves native imageIds on reminders, restores them after
-rerender, and prevents an observing render without uploaded IDs from clearing
-the active image context. It keeps the v16 resource as an upgrade alias.
-The exact original-photo path and completed audit remain mandatory; do not use
-metadata or an old synthetic answer as a substitute for visible images.
+V21 keeps the exact original PNG/JPEG/WebP bytes and source order. It stages
+actual image content blocks in the current MCP Apps user message, alongside the
+current request text. Structured imageIds remain available for the host. Idle
+retained widgets cannot publish empty context. New leases are persisted before
+upload; rerenders restore modelContent and imageIds. Unchanged polls do not
+continually overwrite context. An uncertain send is never retried through a
+second transport.
 
-V17 local suite passed 170 tests, but its live three-image run returned empty
-rows and the four-photo Test AI probe still reported no visible images. Its
-one-image run only passed after a reminder. Those failures remain acceptance
-failures despite completed HTTP200 callbacks.
+Copied gateway build and full suite: **177 PASS, 0 FAIL/SKIP**. Fresh randomized
+JPEG gates passed on v21: three images in **47.4 s**, then one image in **57.8 s**,
+with exact labels, dimensions, visual attributes, grouping and image references.
+Both have completed coworker-widget/chatgpt-web audits. Synthetic evidence:
 
-V18 persists a new native request/lease before uploading files, so a render
-during upload restores the current request instead of publishing the old idle
-state. It restores modelContent as well as imageIds, avoids rewriting identical
-state on every poll, and orders file staging before the awaited host report and
-message dispatch. Regression coverage includes an observer during upload and
-dispatch held until that report completes.
+- `evidence/2026-10-14T18-02-54.077Z-3-images.json`
+- `evidence/2026-10-14T18-05-51.726Z-1-images.json`
 
-Copied gateway build and full suite: **172 PASS, 0 FAIL/SKIP**. Fresh randomized
-live one-image and three-image gates both PASS on v18, with exact content,
-grouping, image references and completed coworker-widget/chatgpt-web audits.
-Observed round trips: **28.6 s** and **35.1 s**. Sanitized synthetic evidence is
-retained in `evidence/2026-10-14T17-28-48.399Z-1-images.json` and
-`evidence/2026-10-14T17-30-46.112Z-3-images.json`.
-The owned v16 run was gracefully stopped with no pending/claimed/draining jobs,
-its evidence retained, and a separate copied v17 run was started. Installed
-gateway source/configuration was preserved. The worker still needs the new UI
-resource before testing. V18 has now been activated and its runtime heartbeat
-verified. The real four-photo semantic readback and group delivery are still
-required for Zalo acceptance.
+The actual Test AI request at 22:51 resolved four original photos, passed the
+photo route before text AI routing, and returned an ANSWER with all four source
+references in **100.2 s**. Visual readback confirmed recognizable bearing marks;
+unreadable marks and unprovided dimensions were left unknown. This probe
+captured all outbound messages locally: **zero actual Zalo sends**. It proves
+native vision and request context, not live listener or group delivery.
 
-OpenAI documents `imageIds` as the files supplied to later model turns through
-[structured widget state](https://developers.openai.com/plugins/build/chatgpt-ui).
+Earlier failures remain failures: v17/v18/v20 real-photo probes returned missing
+image content despite HTTP200 completed callbacks; v18 JPEG and v20 three-JPEG
+runs returned empty rows; v19 four-photo PNG staging timed out. V18 PNG synthetic
+gates passed but did not establish real-photo acceptance. A temporary JPEG/PNG
+conversion experiment was removed; the final Bridge retains original bytes.
 
-Full copied gateway suite: **171/171 PASS** after the v16 resource expectations
-were updated. Preserved live evidence in `evidence/` shows one-image and
-three-image runs with exact random labels, dimensions, grouping and completed
-widget provenance. Round trips were 23.2 s and 41.2 s respectively; these are
-observations, not a latency guarantee. Earlier MCP-only and follow-up-alias
-experiments failed and remain in the ignored local runtime evidence.
+The original installed gateway source/configuration is preserved. Owned runs
+use copied configuration, distinct audit stores and a verified stop file.
+`launch-owned.mjs` defaults to isolated POC mode. Explicit `runtime` mode enables
+the existing authenticated API for normal clients. `start-runtime.ps1` requires
+the reviewed v21 build, refuses an occupied port, creates a fresh audit run and
+streams UTF-8 logs to the user's local PTAP-NEXT directory.
 
-The live native gate does not establish Zalo end-to-end delivery or web catalog
-accuracy. Those require the separate PTAP integration UAT; the Zalo feature
-defaults OFF.
+OpenAI documents structured imageIds and its follow-up extension in the
+[ChatGPT UI reference](https://developers.openai.com/plugins/build/chatgpt-ui).
+MCP Apps defines actual image blocks in the current
+[user message](https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiMessageRequest.html).
+
+Group delivery verification and controlled PRIMARY activation are still
+required. The source feature defaults OFF and can be scoped to Test AI.

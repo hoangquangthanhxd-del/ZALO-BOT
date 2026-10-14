@@ -4,9 +4,23 @@ import {randomUUID} from "node:crypto";
 import { createContext, Script } from "node:vm";
 import { WIDGET_HOST_BRIDGE_JS } from "../src/widget-host-bridge.js";
 
+test('native image bytes are sent in the current user message without text-only context replacement or alias retry',async()=>{
+  const host=harness();
+  await new Script('hostBridgeReady').runInContext(host.browser);
+  new Script("var nativeMessageContent=[{type:'image',mimeType:'image/jpeg',data:'current-image-bytes'}];").runInContext(host.browser);
+  const pending=new Script("sendHostFileMessage('current request')").runInContext(host.browser);
+  const message=host.sent.at(-1)!;
+  assert.equal(message.method,'ui/message');
+  assert.deepEqual(JSON.parse(JSON.stringify(message.params)),{role:'user',content:[{type:'text',text:'current request'},{type:'image',mimeType:'image/jpeg',data:'current-image-bytes'}]});
+  host.reply({jsonrpc:'2.0',id:message.id,result:{}});await pending;
+  assert.equal(host.aliasSends,0);
+  assert.equal(host.sent.filter(row=>row.method==='ui/update-model-context').length,0);
+});
+
 test('native file messages use the shared bridge without replacing staged image context', async () => {
   const host = harness();
   await new Script('hostBridgeReady').runInContext(host.browser);
+  new Script('delete window.openai.sendFollowUpMessage').runInContext(host.browser);
   const pending = new Script("sendHostFileMessage('native request fixture')").runInContext(host.browser);
   assert.equal(host.sent.at(-1)!.method, 'ui/message');
   assert.equal(host.sent.filter(message => message.method === 'ui/update-model-context').length, 0);
@@ -17,11 +31,29 @@ test('native file messages use the shared bridge without replacing staged image 
 test('a rejected native file message is never resent through the compatibility alias', async () => {
   const host = harness();
   await new Script('hostBridgeReady').runInContext(host.browser);
+  new Script('delete window.openai.sendFollowUpMessage').runInContext(host.browser);
   const pending = new Script("sendHostFileMessage('native request fixture')").runInContext(host.browser);
   const rejected = assert.rejects(pending, /host_rpc_rejected/);
   host.reply({ jsonrpc:'2.0', id:host.sent.at(-1)!.id, error:{message:'fixture rejection'} });
   await rejected;
   assert.equal(host.aliasSends, 0);
+});
+
+test('native files select the ChatGPT follow-up extension before invoking a host message',async()=>{
+  const host=harness();
+  await new Script('hostBridgeReady').runInContext(host.browser);
+  await new Script("sendHostFileMessage('current native request')").runInContext(host.browser);
+  assert.equal(host.aliasSends,1);
+  assert.equal(host.sent.filter(message=>['ui/message','ui/update-model-context'].includes(message.method||'')).length,0);
+});
+
+test('a failed native extension invocation never falls back to a second host transport',async()=>{
+  const host=harness();
+  await new Script('hostBridgeReady').runInContext(host.browser);
+  new Script("var nativeAttempts=0; window.openai.sendFollowUpMessage=async()=>{nativeAttempts++;throw new Error('native_send_rejected');};").runInContext(host.browser);
+  await assert.rejects(new Script("sendHostFileMessage('current native request')").runInContext(host.browser),/native_send_rejected/);
+  assert.equal(new Script('nativeAttempts').runInContext(host.browser),1);
+  assert.equal(host.sent.filter(message=>message.method==='ui/message').length,0);
 });
 
 type Message = { jsonrpc: string; id?: string; method?: string; params?: unknown; result?: unknown; error?: unknown };

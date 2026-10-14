@@ -4,7 +4,7 @@ import { createContext, Script } from 'node:vm';
 import { WIDGET_NATIVE_FILES_JS } from '../src/widget-native-files.js';
 
 const data = Buffer.from('fixture bytes').toString('base64');
-function harness({ available = true, current = () => true, valid = true }: { available?: boolean; current?: () => boolean; valid?: boolean } = {}) {
+function harness({ available = true, current = () => true, valid = true, mimeType='image/png' }: { available?: boolean; current?: () => boolean; valid?: boolean; mimeType?:string } = {}) {
   const calls: number[] = [], uploads: Array<{ name: string; type: string; library: boolean }> = [];
   class FixtureFile { constructor(_bytes: unknown, readonly name: string, readonly options: { type: string }) {} }
   const browser = createContext({
@@ -13,7 +13,7 @@ function harness({ available = true, current = () => true, valid = true }: { ava
     callHostTool: async (_name: string, args: { request_id: string; image_index: number }) => {
       calls.push(args.image_index);
       return { structuredContent: { request_id: valid ? args.request_id : 'foreign-request', image_count: 2, image_index: args.image_index },
-        content: [{ type: 'text', text: 'metadata' }, { type: 'image', data, mimeType: 'image/png' }] };
+        content: [{ type: 'text', text: 'metadata' }, { type: 'image', data, mimeType }] };
     },
     window: { openai: available ? {
       uploadFile: async (file: FixtureFile, options: { library: boolean }) => {
@@ -34,6 +34,15 @@ test('native files upload only current request images in stable order without ad
   assert.deepEqual(host.uploads, [
     { name: 'request-image-1.png', type: 'image/png', library: false },
     { name: 'request-image-2.png', type: 'image/png', library: false },
+  ]);
+});
+test('native JPEG uploads use the jpg filename extension and preserve the JPEG MIME type',async()=>{
+  const host=harness({mimeType:'image/jpeg'});
+  const ids=await new Script("uploadNativeRequestImages('request-fixture', 2, current)").runInContext(host.browser);
+  assert.equal(ids.length,2);
+  assert.deepEqual(host.uploads,[
+    {name:'request-image-1.jpg',type:'image/jpeg',library:false},
+    {name:'request-image-2.jpg',type:'image/jpeg',library:false},
   ]);
 });
 test('missing native-file host capability fails before reading or sending anything', async () => {

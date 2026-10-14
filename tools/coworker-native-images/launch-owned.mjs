@@ -10,6 +10,8 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const original = 'C:/Users/Admin/AppData/Local/coworkerapi';
 const app = join(root, '.cache/coworker-native-app');
 const run = resolve(process.argv[2] || join(root, '.cache/coworker-native-run'));
+const mode = process.argv[3] || 'poc';
+if (!['poc', 'runtime'].includes(mode)) throw new Error('GATEWAY_MODE_INVALID');
 if (!/^coworker-native-run(?:-\d+)?$/.test(relative(join(root, '.cache'),run))) throw new Error('POC_RUN_OUTSIDE_CACHE');
 // Never overwrite a previous run, its configuration or its audit evidence.
 await mkdir(run);
@@ -25,11 +27,11 @@ for (const name of ['coworkerapi.json', 'tunnel-settings.json', 'tunnel-credenti
 }
 const child = fork(fileURLToPath(new URL('./launch-server.mjs', import.meta.url)), [], {
   cwd: run, windowsHide: true, stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-  env: { ...process.env, PORT: '3211', HOST: '127.0.0.1', COWORKER_DATA_DIR: join(run, 'data'), COWORKER_POC_APP_DIR:app, COWORKER_NATIVE_POC:'1' },
+  env: { ...process.env, PORT: '3211', HOST: '127.0.0.1', COWORKER_DATA_DIR: join(run, 'data'), COWORKER_POC_APP_DIR:app, COWORKER_NATIVE_POC:mode === 'poc' ? '1' : '0' },
 });
 await writeFile(join(run, 'owner.json'), JSON.stringify({ parentPid: process.pid, childPid: child.pid,
-  app, run, startedAt: new Date().toISOString() }, null, 2), 'utf8');
-console.log(JSON.stringify({ event: 'native_image_poc_started', parentPid: process.pid, childPid: child.pid, port: 3211 }));
+  app, run, mode, startedAt: new Date().toISOString() }, null, 2), 'utf8');
+console.log(JSON.stringify({ event: 'native_image_gateway_started', mode, parentPid: process.pid, childPid: child.pid, port: 3211 }));
 let stopping = false;
 const timer = setInterval(async () => {
   if (stopping) return;

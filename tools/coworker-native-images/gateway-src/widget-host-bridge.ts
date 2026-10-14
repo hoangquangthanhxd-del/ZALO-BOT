@@ -38,7 +38,7 @@ if (standardHostAvailable) window.addEventListener('message', event => {
 }, { passive:true });
 const hostBridgeReady = standardHostAvailable ? (async () => {
   try {
-    const result = await hostRpc('ui/initialize', { appInfo:{ name:'CoworkerAPI bridge', version:'14' }, appCapabilities:{}, protocolVersion:'2026-01-26' });
+    const result = await hostRpc('ui/initialize', { appInfo:{ name:'CoworkerAPI bridge', version:'20' }, appCapabilities:{}, protocolVersion:'2026-01-26' });
     if (result?.protocolVersion !== '2026-01-26') throw new Error('unsupported_host_protocol');
     window.parent.postMessage({ jsonrpc:'2.0', method:'ui/notifications/initialized', params:{} }, '*');
     hostTransport = 'mcp-apps';
@@ -73,9 +73,22 @@ function sendHostMessage(prompt) {
   return window.openai.sendFollowUpMessage({ prompt, scrollToBottom:false });
 }
 function sendHostFileMessage(prompt) {
-  // imageIds have already been staged in structured widget state. Replacing
-  // model context here could discard them; trigger the supported shared message
-  // directly. Never retry a native send through the compatibility alias.
+  // imageIds have already been staged in structured widget state. Do not
+  // replace them with text-only model context when triggering the host turn.
+  // Structured imageIds are a ChatGPT extension. Choose its follow-up extension
+  // up front when present, so the staged files travel with the new host turn.
+  // Never switch transports after an invocation has succeeded or failed.
+  // Carry the actual image blocks in the new user message when available. This
+  // avoids relying on asynchronous widget context projection for later albums.
+  if (hostTransport === 'mcp-apps' && typeof nativeMessageContent !== 'undefined' && nativeMessageContent.length) {
+    return hostRpc('ui/message', { role:'user', content:[{type:'text',text:prompt},...nativeMessageContent] },20000).then(result=>{
+      if(result?.isError)throw new Error('host_message_rejected');
+      return result;
+    });
+  }
+  if (typeof window.openai?.sendFollowUpMessage === 'function') {
+    return window.openai.sendFollowUpMessage({ prompt, scrollToBottom:false });
+  }
   if (hostTransport !== 'mcp-apps') throw new Error('host_native_message_unavailable');
   return hostRpc('ui/message', { role:'user', content:[{type:'text', text:prompt}] }, 20000).then(result => {
     if (result?.isError) throw new Error('host_message_rejected');
