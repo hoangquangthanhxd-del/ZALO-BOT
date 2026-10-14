@@ -103,6 +103,26 @@ v14 as well; preserving source alone does not restore the host's cached tools.
 
 ## Verified evidence
 
+### Native context repair candidate v17
+
+The Test AI real-photo probe returned completed HTTP200 callbacks but explicitly
+reported unavailable image content. Those probes failed vision acceptance.
+The v17 candidate preserves native imageIds on reminders, restores them after
+rerender, and prevents an observing render without uploaded IDs from clearing
+the active image context. It keeps the v16 resource as an upgrade alias.
+The exact original-photo path and completed audit remain mandatory; do not use
+metadata or an old synthetic answer as a substitute for visible images.
+
+Local copied gateway suite on this candidate: 170 PASS, 0 FAIL/SKIP. Native live
+retest is pending; the earlier v16 synthetic PASS below does not certify v17.
+The owned v16 run was gracefully stopped with no pending/claimed/draining jobs,
+its evidence retained, and a separate copied v17 run was started. Installed
+gateway source/configuration was preserved. The worker still needs the new UI
+resource before native acceptance can be re-established.
+
+OpenAI documents `imageIds` as the files supplied to later model turns through
+[structured widget state](https://developers.openai.com/plugins/build/chatgpt-ui).
+
 Full copied gateway suite: **171/171 PASS** after the v16 resource expectations
 were updated. Preserved live evidence in `evidence/` shows one-image and
 three-image runs with exact random labels, dimensions, grouping and completed

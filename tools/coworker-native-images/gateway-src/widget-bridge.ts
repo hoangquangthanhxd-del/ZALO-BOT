@@ -51,7 +51,7 @@ export class WidgetBridge implements ChatGPTBridge {
       this.mcpDiagnostics.lastRequestedResource = typeof resourceUri === "string" && resourceUri.length <= 160
         && /^ui:\/\/[a-z0-9-]{1,40}\/[a-z0-9._/-]{1,110}\.html$/i.test(resourceUri)
         ? resourceUri : "redacted";
-      if (resourceUri !== "ui://coworkerapi/bridge-v16.html") this.mcpDiagnostics.legacyResourceReads++;
+      if (resourceUri !== "ui://coworkerapi/bridge-v17.html") this.mcpDiagnostics.legacyResourceReads++;
     } else this.mcpDiagnostics.other++;
   }
   recordActivation(): string {
@@ -66,7 +66,7 @@ export class WidgetBridge implements ChatGPTBridge {
   acceptsWidget(widgetId?: string): boolean { return this.selectedWidgetId === null || widgetId === this.selectedWidgetId; }
   recordResourceRead(uri: string): void {
     this.uiDiagnostics.resourceReads++;
-    this.uiDiagnostics.lastResource = uri === "ui://coworkerapi/bridge-v16.html" ? uri : "other";
+    this.uiDiagnostics.lastResource = uri === "ui://coworkerapi/bridge-v17.html" ? uri : "other";
   }
 
   get pendingCount(): number { return this.turns.size; }
@@ -76,7 +76,7 @@ export class WidgetBridge implements ChatGPTBridge {
   heartbeat(runtimeVersion?: string, widgetId?: string): void {
     if (!this.acceptsWidget(widgetId)) return;
     this.lastPollAt = Date.now();
-    this.lastRuntime = ["bridge-v3", "bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16"].includes(runtimeVersion ?? "") ? runtimeVersion! : null;
+    this.lastRuntime = ["bridge-v3", "bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16", "bridge-v17"].includes(runtimeVersion ?? "") ? runtimeVersion! : null;
     if (this.lastRuntime) this.runtimePolls.versioned++;
     else this.runtimePolls.unversioned++;
   }
@@ -183,7 +183,7 @@ export class WidgetBridge implements ChatGPTBridge {
     this.heartbeat(runtimeVersion, widgetId);
     this.pruneCancelled();
     this.recoverUnsentClaims();
-    const leasedRuntime = ["bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16"].includes(runtimeVersion ?? "");
+    const leasedRuntime = ["bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16", "bridge-v17"].includes(runtimeVersion ?? "");
     if (leasedRuntime && (!widgetId || !/^[a-f0-9-]{36}$/i.test(widgetId))) return null;
     if ([...this.cancelledTurns.values()].some((turn) => turn.drainUntil > Date.now())) return null;
     const owned = leasedRuntime ? [...this.turns.values()].find(t => t.claimed && t.lease?.owner === widgetId) : undefined;
@@ -209,7 +209,7 @@ export class WidgetBridge implements ChatGPTBridge {
         ? `For client-owned function tools (${allowedTools.join(", ")}), do not execute them with Coworker MCP. If a client function is needed, call workbench_api_submit with request_id=${turn.id} and tool_calls=[{name,arguments}] using only listed names and JSON object arguments. The API client will run those calls and send the results in a later request. Otherwise call workbench_api_submit with request_id=${turn.id} and your complete final text. Do not finish only in the chat UI.`
         : `When done, call the MCP tool workbench_api_submit with request_id=${turn.id} and your complete final text. Do not finish only in the chat UI.`,
       "Request JSON:", JSON.stringify({ model: turn.request.model, instructions: turn.request.instructions, input: turn.request.input }),
-      ...(turn.images.length ? [`This request contains ${turn.images.length} native images. FIRST call workbench_api_read_request with request_id=${turn.id} and image_index=0. Each call returns one actual image in MCP image content. Read ALL images by calling the same tool with image_index=1 through ${turn.images.length - 1} as needed BEFORE answering. image_reference entries are identifiers, not images. Never infer visual content from these references. If image content is unavailable, explicitly report that limitation rather than guessing.`] : []),
+      ...(turn.images.length ? [`This request contains ${turn.images.length} native images uploaded and attached through the current widget imageIds state, in image_index order. FIRST call workbench_api_read_request with request_id=${turn.id} and image_index=0. Read ALL images by index through ${turn.images.length - 1} before answering. The tool maps source IDs to the uploaded native image attachments; if its image block does not render, use the ACTUAL attached images when visible, not metadata or previous chat pictures. image_reference entries alone are not images. If neither actual attachments nor tool images are visible, explicitly report that limitation rather than guessing.`] : []),
       ...(allowedTools.length ? ["Client tool definitions:", JSON.stringify(turn.request.tools), "Client tool choice:", JSON.stringify(turn.request.tool_choice ?? "auto")] : []),
       `End of request_id=${turn.id}. Continue from the END of Request JSON.input${Array.isArray(turn.request.input) ? ` (last input index=${turn.request.input.length - 1})` : ""}, not its first message. Earlier user messages and assistant replies are history, not a new task or an answer to copy. If the final input is a tool result, use it to continue the latest user task. Submit the newly computed answer or next client-owned tool call for THIS request_id only.`,
     ].join("\n");

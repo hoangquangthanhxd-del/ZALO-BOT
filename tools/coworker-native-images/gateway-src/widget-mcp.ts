@@ -9,14 +9,14 @@ import { WIDGET_NATIVE_FILES_JS } from './widget-native-files.js';
 import { PACKAGE_VERSION } from "./package-version.js";
 import { WIDGET_CHAT_POLICY, widgetSubmitNotice } from "./widget-chat-policy.js";
 
-export const WIDGET_URI = "ui://coworkerapi/bridge-v16.html";
-export const WIDGET_HTML = `<!doctype html><html><head><meta charset="utf-8"></head><body style="font:13px system-ui;padding:10px"><strong>CoworkerAPI bridge · v16</strong><div id="status">Connecting…</div><script>
+export const WIDGET_URI = "ui://coworkerapi/bridge-v17.html";
+export const WIDGET_HTML = `<!doctype html><html><head><meta charset="utf-8"></head><body style="font:13px system-ui;padding:10px"><strong>CoworkerAPI bridge · v17</strong><div id="status">Connecting…</div><script>
 ${WIDGET_HOST_BRIDGE_JS}
 ${WIDGET_NATIVE_FILES_JS}
 const uuid = value => typeof value === 'string' && /^[a-f0-9-]{36}$/i.test(value);
 const chatPolicy = ${JSON.stringify(WIDGET_CHAT_POLICY)};
 const saved = window.openai?.widgetState?.privateContent || window.openai?.widgetState;
-const previous = ['bridge-v4','bridge-v5','bridge-v6','bridge-v7','bridge-v8','bridge-v9','bridge-v10','bridge-v11','bridge-v12','bridge-v13','bridge-v14','bridge-v15','bridge-v16'].includes(saved?.version) ? saved : {};
+const previous = ['bridge-v4','bridge-v5','bridge-v6','bridge-v7','bridge-v8','bridge-v9','bridge-v10','bridge-v11','bridge-v12','bridge-v13','bridge-v14','bridge-v15','bridge-v16','bridge-v17'].includes(saved?.version) ? saved : {};
 let widgetId = uuid(previous.widgetId) ? previous.widgetId : crypto.randomUUID();
 let running = false;
 // A result callback can arrive before the host finishes its conversation turn.
@@ -27,7 +27,8 @@ let leaseId = activeRequest ? previous.leaseId : null;
 let phase = ['reserved','sending','sent','failed','unknown'].includes(previous.phase) ? previous.phase : 'reserved';
 let activePrompt = null;
 let activeNativeImageCount = Number.isInteger(previous.activeNativeImageCount) ? Math.max(0, Math.min(10, previous.activeNativeImageCount)) : 0;
-let nativeImageIds = [];
+let nativeImageIds = activeRequest && Array.isArray(window.openai?.widgetState?.imageIds)
+  ? window.openai.widgetState.imageIds.filter(id => typeof id === 'string') : [];
 let sendAttempts = Number.isInteger(previous.attempts) ? Math.max(0, Math.min(3, previous.attempts)) : 0;
 let nextAttemptAt = Number.isFinite(previous.nextAttemptAt) ? previous.nextAttemptAt : 0;
 let nextReminderAt = Number.isFinite(previous.nextReminderAt) ? previous.nextReminderAt : 0;
@@ -35,7 +36,10 @@ let reminders = Number.isInteger(previous.reminders) ? Math.max(0, Math.min(2, p
 let nextAllowedAt = 0;
 const status = document.getElementById('status');
 function persist() {
-  const control = { version:'bridge-v16', widgetId, activeRequest, leaseId, phase, attempts:sendAttempts,
+  // A second render/tab can observe the lease before it has this turn's uploaded
+  // IDs. It must not replace the active native context with an empty image list.
+  if (activeNativeImageCount && nativeImageIds.length !== activeNativeImageCount) return;
+  const control = { version:'bridge-v17', widgetId, activeRequest, leaseId, phase, attempts:sendAttempts,
     nextAttemptAt, nextReminderAt, reminders, activeNativeImageCount };
   try { window.openai?.setWidgetState?.(activeNativeImageCount
     ? { modelContent:activePrompt || '', imageIds:nativeImageIds, privateContent:control }
@@ -54,7 +58,7 @@ async function poll(args={}) {
     // consume the requests intended for a newly activated, idle worker chat.
     widgetId = selectedId; clearActive(); nextAllowedAt = 0;
   }
-  return bounded(Promise.resolve().then(() => callHostTool('workbench_api_poll', { ...args, runtime_version: 'bridge-v16', widget_id: widgetId, host_transport:hostTransport, host_busy:activeRequest !== null || hostSendsPending > 0 || Date.now() < nextAllowedAt })), 10000);
+  return bounded(Promise.resolve().then(() => callHostTool('workbench_api_poll', { ...args, runtime_version: 'bridge-v17', widget_id: widgetId, host_transport:hostTransport, host_busy:activeRequest !== null || hostSendsPending > 0 || Date.now() < nextAllowedAt })), 10000);
 }
 function report(requestId, claimId, delivery, failureStage) { return poll({ active_request_id:requestId, claim_lease_id:claimId, ...(delivery ? {delivery} : {}), ...(failureStage ? {failure_stage:failureStage} : {}) }); }
 function clearActive() {
@@ -122,7 +126,11 @@ async function remind() {
   if (!permission?.active_pending) { clearActive(); return; }
   if (!permission.delivery_permitted || activeRequest !== requestId || leaseId !== claimId) return;
   reminders++; nextReminderAt = Date.now() + 60000; persist();
-  void bounded(Promise.resolve().then(() => sendHostMessage('Bridge reminder: for request_id=' + requestId + ', read workbench_api_read_request if needed, then call workbench_api_submit. Do not answer only in chat or call workbench_api_activate. ' + chatPolicy)), 20000).catch(() => {});
+  const prompt = 'Bridge reminder: for request_id=' + requestId + ', read workbench_api_read_request if needed, then call workbench_api_submit. Do not answer only in chat or call workbench_api_activate. ' + chatPolicy;
+  // A text context replacement drops the staged file references. Native reminders
+  // must preserve the exact current images, including after a widget rerender.
+  const send = activeNativeImageCount ? sendHostFileMessage : sendHostMessage;
+  void bounded(Promise.resolve().then(() => send(prompt)), 20000).catch(() => {});
 }
 async function loop() {
   if (running) return;
@@ -177,7 +185,7 @@ export function registerWidgetTools(server: McpServer, bridge: WidgetBridge): vo
   // current implementation at those URIs too; never strand a retained chat.
   // Observed in live ChatGPT resources/read after migration from Coworker.
   const retainedCoworkerUri = "ui://coworker/api-bridge-v3.html";
-  for (const [index, uri] of [WIDGET_URI, "ui://coworkerapi/bridge-v15.html", "ui://coworkerapi/bridge-v14.html", "ui://coworkerapi/bridge-v13.html", "ui://coworkerapi/bridge-v12.html", "ui://coworkerapi/bridge-v11.html", "ui://coworkerapi/bridge-v10.html", "ui://coworkerapi/bridge-v9.html", "ui://coworkerapi/bridge-v8.html", "ui://coworkerapi/bridge-v7.html", "ui://coworkerapi/bridge-v6.html", "ui://coworkerapi/bridge-v5.html", "ui://coworkerapi/bridge-v4.html", "ui://coworkerapi/bridge-v3.html", "ui://coworkerapi/bridge-v2.html", "ui://coworkerapi/bridge-v1.html", retainedCoworkerUri].entries()) {
+  for (const [index, uri] of [WIDGET_URI, "ui://coworkerapi/bridge-v16.html", "ui://coworkerapi/bridge-v15.html", "ui://coworkerapi/bridge-v14.html", "ui://coworkerapi/bridge-v13.html", "ui://coworkerapi/bridge-v12.html", "ui://coworkerapi/bridge-v11.html", "ui://coworkerapi/bridge-v10.html", "ui://coworkerapi/bridge-v9.html", "ui://coworkerapi/bridge-v8.html", "ui://coworkerapi/bridge-v7.html", "ui://coworkerapi/bridge-v6.html", "ui://coworkerapi/bridge-v5.html", "ui://coworkerapi/bridge-v4.html", "ui://coworkerapi/bridge-v3.html", "ui://coworkerapi/bridge-v2.html", "ui://coworkerapi/bridge-v1.html", retainedCoworkerUri].entries()) {
   server.registerResource(`coworkerapi-bridge-${index}`, uri, {}, async () => {
     bridge.recordResourceRead(uri);
     return {
@@ -195,17 +203,17 @@ export function registerWidgetTools(server: McpServer, bridge: WidgetBridge): vo
     let widgetId: string;
     try { widgetId = bridge.recordActivation(); }
     catch { return { isError: true, content: [{ type: "text", text: "CoworkerAPI has a pending or draining request. Wait for it to finish before switching the worker chat." }] }; }
-    return { content: [{ type: "text", text: "CoworkerAPI bridge v16 widget requested. This activation selects this chat as the API worker; other retained widgets will not claim its requests. Use an idle ChatGPT chat, separate from the chat running API clients or investigations, to avoid waiting for the client's own turn to finish. Wait for the dashboard to confirm its heartbeat; this tool result alone does not prove connection. Keep this conversation open while using API clients. Do not post setup narration or claim Thành công from this opening acknowledgement. " + WIDGET_CHAT_POLICY }], structuredContent: { status: "opening", widget_runtime: "bridge-v16", widget_id: widgetId } };
+    return { content: [{ type: "text", text: "CoworkerAPI bridge v17 widget requested. This activation selects this chat as the API worker; other retained widgets will not claim its requests. Use an idle ChatGPT chat, separate from the chat running API clients or investigations, to avoid waiting for the client's own turn to finish. Wait for the dashboard to confirm its heartbeat; this tool result alone does not prove connection. Keep this conversation open while using API clients. Do not post setup narration or claim Thành công from this opening acknowledgement. " + WIDGET_CHAT_POLICY }], structuredContent: { status: "opening", widget_runtime: "bridge-v17", widget_id: widgetId } };
   });
   server.registerTool("workbench_api_poll", {
     title: "Claim next CoworkerAPI request",
     description: "Used by the CoworkerAPI bridge widget to take one pending request. Do not call directly unless running the bridge.",
-    inputSchema: { active_request_id: z.string().uuid().optional(), runtime_version: z.enum(["bridge-v3", "bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16"]).optional(), widget_id: z.string().uuid().optional(), claim_lease_id: z.string().uuid().optional(), heartbeat_only: z.boolean().optional(), host_busy: z.boolean().optional(), delivery: z.enum(["sent", "send_failed", "send_unknown", "reminder", "send_started", "ack_seen", "host_invoked"]).optional(), failure_stage: z.enum(["sync_throw", "async_reject", "deadline"]).optional(), host_transport: z.enum(["mcp-apps", "openai-alias"]).optional() },
+    inputSchema: { active_request_id: z.string().uuid().optional(), runtime_version: z.enum(["bridge-v3", "bridge-v4", "bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16", "bridge-v17"]).optional(), widget_id: z.string().uuid().optional(), claim_lease_id: z.string().uuid().optional(), heartbeat_only: z.boolean().optional(), host_busy: z.boolean().optional(), delivery: z.enum(["sent", "send_failed", "send_unknown", "reminder", "send_started", "ack_seen", "host_invoked"]).optional(), failure_stage: z.enum(["sync_throw", "async_reject", "deadline"]).optional(), host_transport: z.enum(["mcp-apps", "openai-alias"]).optional() },
     outputSchema: { turn: z.object({ request_id: z.string().uuid(), prompt: z.string(), claim_lease_id: z.string().uuid().optional(), delivery_state: z.string().optional() }).nullable(), active_pending: z.boolean(), delivery_permitted: z.boolean().optional(), delivery_state: z.string().optional(), upgrade_required: z.boolean().optional(), worker_selected: z.boolean().optional() },
     _meta: { ui: { visibility: ["app"] } },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   }, async ({ active_request_id, delivery, runtime_version, widget_id, claim_lease_id, heartbeat_only, failure_stage, host_transport, host_busy }) => {
-    if (!["bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16"].includes(runtime_version ?? "") || !widget_id) return { structuredContent: { turn: null, active_pending: false, upgrade_required: true }, content: [{ type: "text", text: "Open workbench_api_activate again to load bridge-v16 before using API clients." }] };
+    if (!["bridge-v5", "bridge-v6", "bridge-v7", "bridge-v8", "bridge-v9", "bridge-v10", "bridge-v11", "bridge-v12", "bridge-v13", "bridge-v14", "bridge-v15", "bridge-v16", "bridge-v17"].includes(runtime_version ?? "") || !widget_id) return { structuredContent: { turn: null, active_pending: false, upgrade_required: true }, content: [{ type: "text", text: "Open workbench_api_activate again to load bridge-v17 before using API clients." }] };
     if (!bridge.acceptsWidget(widget_id)) return { structuredContent: { turn: null, active_pending: false, worker_selected: false }, content: [{ type: "text", text: "Another chat is selected as the API worker; no request was claimed or dispatched." }] };
     bridge.recordHostBusy(widget_id, host_busy);
     bridge.recordHostTransport(host_transport);
