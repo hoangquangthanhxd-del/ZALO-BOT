@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { join, resolve, relative } from 'node:path';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const original = 'C:/Users/Admin/AppData/Local/coworkerapi';
+const original = process.argv[4] || 'C:/Users/Admin/AppData/Local/coworkerapi';
 const app = join(root, '.cache/coworker-native-app');
 const run = resolve(process.argv[2] || join(root, '.cache/coworker-native-run'));
 const mode = process.argv[3] || 'poc';
@@ -27,7 +27,8 @@ for (const name of ['coworkerapi.json', 'tunnel-settings.json', 'tunnel-credenti
 }
 const child = fork(fileURLToPath(new URL('./launch-server.mjs', import.meta.url)), [], {
   cwd: run, windowsHide: true, stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-  env: { ...process.env, PORT: '3211', HOST: '127.0.0.1', COWORKER_DATA_DIR: join(run, 'data'), COWORKER_POC_APP_DIR:app, COWORKER_NATIVE_POC:mode === 'poc' ? '1' : '0' },
+  env: { ...process.env, PORT: '3211', HOST: '127.0.0.1', COWORKER_DATA_DIR: join(run, 'data'), COWORKER_POC_APP_DIR:app, COWORKER_NATIVE_POC:mode === 'poc' ? '1' : '0',
+    ...(mode === 'runtime' ? {COWORKER_WIDGET_SELECTION_FILE:join(original,'selected-worker.json')} : {}) },
 });
 await writeFile(join(run, 'owner.json'), JSON.stringify({ parentPid: process.pid, childPid: child.pid,
   app, run, mode, startedAt: new Date().toISOString() }, null, 2), 'utf8');

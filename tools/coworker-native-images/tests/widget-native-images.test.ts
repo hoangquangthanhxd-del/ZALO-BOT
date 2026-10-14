@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { prepareNativeImages, MAX_NATIVE_IMAGE_BYTES, NativeImageError } from '../src/widget-images.js';
@@ -10,6 +13,21 @@ import { buildServer } from '../src/app.js';
 const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6WbEAAAAASUVORK5CYII=';
 const url = 'data:image/png;base64,' + png;
 const photo = (image_id = 'img-1') => ({ type: 'input_image', image_url: url, image_id });
+
+test('runtime keeps the selected worker across restarts and rejects corrupt selection state',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'coworker-selected-'));
+  const selection=join(directory,'selected-worker.json');
+  try {
+    const first=new WidgetBridge(0,30000,selection),id=first.recordActivation();
+    first.shutdown();
+    const restarted=new WidgetBridge(0,30000,selection);
+    assert.equal(restarted.acceptsWidget(id),true);
+    assert.equal(restarted.acceptsWidget(randomUUID()),false);
+    assert.equal(restarted.snapshot().ui.workerSelected,true);
+    await writeFile(selection,'{"widgetId":"broken"}');
+    assert.throws(()=>new WidgetBridge(0,30000,selection),/widget_selection_unavailable/);
+  }finally{await rm(directory,{recursive:true,force:true});}
+});
 
 test('normalize both API image formats without leaking bytes into prompt or mutating input', () => {
   const input = [{ role: 'user', content: [
@@ -86,7 +104,10 @@ test('real local MCP returns native image blocks by index and revokes them after
     void pending.catch(() => {});
     const deadline = Date.now() + 5000;
     while (!bridge.pendingCount && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10));
-    const turn = bridge.claim(); assert.ok(turn);
+    assert.equal(bridge.claim('bridge-v16',randomUUID()),null,'retained older widgets cannot take a native request after restart');
+    assert.equal(bridge.claim('bridge-v20',randomUUID()),null);
+    assert.equal(bridge.claim(),null);
+    const turn = bridge.claim('bridge-v21', randomUUID()); assert.ok(turn);
     assert.match(turn.prompt, /workbench_api_read_request/);
     assert.ok(!turn.prompt.includes(png));
     for (const index of [0, 1, 2]) {
@@ -119,7 +140,9 @@ test('completion and shutdown remove native image access; a later text request h
   const bridge = new WidgetBridge(0);
   const run = bridge.respond({ model: 'chatgpt-web', input: [photo()], stream: false }, new AbortController().signal)[Symbol.asyncIterator]();
   const first = run.next();
-  const turn = bridge.claim(); assert.ok(turn);
+  const widgetId=randomUUID();
+  const turn = bridge.claim('bridge-v21', widgetId); assert.ok(turn);
+  bridge.leasedStatus(turn.request_id,widgetId,turn.claim_lease_id!,'send_started');
   assert.equal(bridge.readRequestImage(turn.request_id)?.imageCount, 1);
   assert.equal(await bridge.submit(turn.request_id, { text: 'LOCAL_TEST_CALLBACK_ONLY' }), 'accepted');
   assert.equal(bridge.readRequestImage(turn.request_id), null);
@@ -127,7 +150,7 @@ test('completion and shutdown remove native image access; a later text request h
   bridge.recordHostBusy('unused', false);
   const later = bridge.respond({ model: 'chatgpt-web', input: 'next client text', stream: false }, new AbortController().signal)[Symbol.asyncIterator]();
   const laterFirst = later.next();
-  const next = bridge.claim(); assert.ok(next);
+  const next = bridge.claim('bridge-v21', randomUUID()); assert.ok(next);
   assert.equal(bridge.readRequestImage(next.request_id)?.imageCount, 0);
   bridge.shutdown(); await laterFirst; while (!(await later.next()).done) {}
   assert.equal(bridge.readRequestImage(next.request_id), null);

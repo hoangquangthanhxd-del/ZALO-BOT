@@ -113,7 +113,7 @@ upload; rerenders restore modelContent and imageIds. Unchanged polls do not
 continually overwrite context. An uncertain send is never retried through a
 second transport.
 
-Copied gateway build and full suite: **177 PASS, 0 FAIL/SKIP**. Fresh randomized
+Copied gateway build and full suite: **178 PASS, 0 FAIL/SKIP**. Fresh randomized
 JPEG gates passed on v21: three images in **47.4 s**, then one image in **57.8 s**,
 with exact labels, dimensions, visual attributes, grouping and image references.
 Both have completed coworker-widget/chatgpt-web audits. Synthetic evidence:
@@ -139,12 +139,36 @@ use copied configuration, distinct audit stores and a verified stop file.
 `launch-owned.mjs` defaults to isolated POC mode. Explicit `runtime` mode enables
 the existing authenticated API for normal clients. `start-runtime.ps1` requires
 the reviewed v21 build, refuses an occupied port, creates a fresh audit run and
-streams UTF-8 logs to the user's local PTAP-NEXT directory.
+streams UTF-8 logs to the user's local PTAP-NEXT directory. The persistent task
+uses a protected configuration copy, its own dependencies installed from the
+lockfile, and a hash-matched copy of the existing tunnel binary. It does not
+depend on the installed gateway's AppData paths being accessible to a scheduled
+task. These paths failed during initial startup and were removed as runtime
+dependencies. No credentials or endpoint permissions were changed.
+
+Runtime mode atomically saves the selected worker in the protected configuration
+directory. Restart restores that selection; corrupt selection state fails closed.
+Older retained widget versions cannot claim native image jobs. A controlled
+task restart verified the same selection, v21 heartbeat, ready inference and
+zero pending/claimed/draining requests.
 
 OpenAI documents structured imageIds and its follow-up extension in the
 [ChatGPT UI reference](https://developers.openai.com/plugins/build/chatgpt-ui).
 MCP Apps defines actual image blocks in the current
 [user message](https://apps.extensions.modelcontextprotocol.io/api/interfaces/app.McpUiMessageRequest.html).
 
-Group delivery verification and controlled PRIMARY activation are still
-required. The source feature defaults OFF and can be scoped to Test AI.
+### Live Test AI acceptance, 15 October 2026
+
+The PRIMARY listener was switched to the reviewed PTAP image handler with the
+image feature enabled only for Test AI. A new linked-staff request at 01:17
+replied to the original four-photo album. The actual listener queued
+IMAGE_ANALYSIS in 1.1 s and replied in **104.1 s**, with an ANSWER, four rows,
+two requested columns and all four source references. The native provider audit
+completed. Zalo history independently verified exactly one acknowledgement and
+one answer from the correct bot in the correct group at 01:19. The answer did
+not reuse synthetic TST codes or unrelated order context, and did not invent
+dimensions absent from the photos. Private raw evidence remains outside Git.
+
+The source feature still defaults OFF. The local rollout is scoped to Test AI;
+keep the selected ChatGPT worker conversation open for inference. The separate
+purchase bot and the saved Production environment were preserved.

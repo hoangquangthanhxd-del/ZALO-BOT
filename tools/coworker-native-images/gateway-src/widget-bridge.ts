@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import type { BridgeContext, BridgeEvent, ChatGPTBridge, ResponseRequest } from "./protocol.js";
 import { widgetToolPolicy, WidgetToolPolicyError, validateWidgetToolSchemas, type WidgetToolPolicy } from "./widget-tool-policy.js";
 import { checkToolSchemas } from "./tool-schema.js";
@@ -28,7 +29,16 @@ export type HostFailureStage = "sync_throw" | "async_reject" | "deadline";
 export class WidgetBridge implements ChatGPTBridge {
   private readonly turns = new Map<string, Turn>();
   private readonly cancelledTurns = new Map<string, { drainUntil: number; expiresAt: number }>();
-  constructor(private readonly cancellationGraceMs = 60_000, private readonly claimLeaseMs = 30_000) {}
+  constructor(private readonly cancellationGraceMs = 60_000, private readonly claimLeaseMs = 30_000,
+    private readonly selectionFile = process.env.COWORKER_WIDGET_SELECTION_FILE) {
+    if(selectionFile) {
+      try {
+        const saved=JSON.parse(readFileSync(selectionFile,'utf8'));
+        if(typeof saved.widgetId !== 'string' || !/^[a-f0-9-]{36}$/i.test(saved.widgetId))throw new Error('widget_selection_invalid');
+        this.selectedWidgetId=saved.widgetId;
+      } catch(error) { if((error as NodeJS.ErrnoException).code !== 'ENOENT')throw new Error('widget_selection_unavailable'); }
+    }
+  }
   private lastPollAt = 0;
   private selectedWidgetId: string | null = null;
   private hostBusy = false;
@@ -57,7 +67,12 @@ export class WidgetBridge implements ChatGPTBridge {
   recordActivation(): string {
     this.pruneCancelled();
     if (this.hostBusy || this.turns.size || [...this.cancelledTurns.values()].some(turn => turn.drainUntil > Date.now())) throw new Error("widget_busy");
-    this.selectedWidgetId = randomUUID();
+    const widgetId=randomUUID();
+    if(this.selectionFile) {
+      writeFileSync(this.selectionFile+'.tmp',JSON.stringify({widgetId}),{mode:0o600});
+      renameSync(this.selectionFile+'.tmp',this.selectionFile);
+    }
+    this.selectedWidgetId = widgetId;
     this.lastPollAt = 0;
     this.hostBusy = false;
     this.uiDiagnostics.activations++;
@@ -192,6 +207,9 @@ export class WidgetBridge implements ChatGPTBridge {
     if ([...this.turns.values()].some((item) => item.claimed)) return null;
     const turn = [...this.turns.values()].find((item) => !item.claimed);
     if (!turn) return null;
+    // Retained widgets can resume after a gateway restart. Only the native
+    // runtime verified with original albums may claim a new image request.
+    if (turn.images.length && runtimeVersion !== 'bridge-v21') return null;
     turn.claimed = true;
     turn.claimedAt = Date.now();
     if (leasedRuntime) turn.lease = { id: randomUUID(), owner: widgetId!, expiresAt: Date.now() + this.claimLeaseMs, state: "reserved" };
