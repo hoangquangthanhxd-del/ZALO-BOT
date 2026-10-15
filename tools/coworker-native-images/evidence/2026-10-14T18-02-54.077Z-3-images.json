@@ -1,0 +1,62 @@
+{
+  "startedAt": "2026-10-14T18:02:54.077Z",
+  "selectedImages": 3,
+  "imageHashes": [
+    {
+      "imageId": "img-1",
+      "sha256": "d9855e3e391df3b01c69f64b74172bc22b5d4052d8becdcf93de08c0952532e9"
+    },
+    {
+      "imageId": "img-2",
+      "sha256": "addf39ecea8b228e7025a2be7e2b1d6821b6704cabf7c39915a3be613423189e"
+    },
+    {
+      "imageId": "img-3",
+      "sha256": "3b02193c55684c01757b3b4ed412989831bb87a576fd7f238173e9e4f16de77c"
+    }
+  ],
+  "status": "PASS",
+  "httpStatus": 200,
+  "requestId": "req-3m",
+  "latencyMs": 47386,
+  "contentMatches": true,
+  "provenanceMatches": true,
+  "actual": {
+    "rows": [
+      {
+        "code": "TST-5710F4FB",
+        "dimensionsMm": [
+          31,
+          69,
+          8
+        ],
+        "color": "blue",
+        "shape": "ring",
+        "sourceImageIds": [
+          "img-1",
+          "img-2"
+        ]
+      },
+      {
+        "code": "TST-D21E97E3",
+        "dimensionsMm": [
+          49,
+          82,
+          19
+        ],
+        "color": "orange",
+        "shape": "ring",
+        "sourceImageIds": [
+          "img-3"
+        ]
+      }
+    ]
+  },
+  "audit": {
+    "provider": "coworker-widget",
+    "model": "chatgpt-web",
+    "outcome": "completed"
+  },
+  "finishedAt": "2026-10-14T18:03:41.502Z",
+  "totalLatencyMs": 47424
+}

@@ -1,0 +1,40 @@
+{
+  "startedAt": "2026-10-14T18:05:51.726Z",
+  "selectedImages": 1,
+  "imageHashes": [
+    {
+      "imageId": "img-1",
+      "sha256": "d9855e3e391df3b01c69f64b74172bc22b5d4052d8becdcf93de08c0952532e9"
+    }
+  ],
+  "status": "PASS",
+  "httpStatus": 200,
+  "requestId": "req-aw",
+  "latencyMs": 57814,
+  "contentMatches": true,
+  "provenanceMatches": true,
+  "actual": {
+    "rows": [
+      {
+        "code": "TST-5710F4FB",
+        "dimensionsMm": [
+          31,
+          69,
+          8
+        ],
+        "color": "blue",
+        "shape": "ring",
+        "sourceImageIds": [
+          "img-1"
+        ]
+      }
+    ]
+  },
+  "audit": {
+    "provider": "coworker-widget",
+    "model": "chatgpt-web",
+    "outcome": "completed"
+  },
+  "finishedAt": "2026-10-14T18:06:49.571Z",
+  "totalLatencyMs": 57845
+}

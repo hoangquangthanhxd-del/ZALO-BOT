@@ -1,0 +1,2 @@
+# Baseline byte hashes and embedded widget source require stable line endings.
+tools/coworker-native-images/** text eol=lf
