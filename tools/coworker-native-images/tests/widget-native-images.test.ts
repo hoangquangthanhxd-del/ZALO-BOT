@@ -9,6 +9,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { prepareNativeImages, MAX_NATIVE_IMAGE_BYTES, NativeImageError } from '../src/widget-images.js';
 import { WidgetBridge } from '../src/widget-bridge.js';
 import { buildServer } from '../src/app.js';
+import type { BridgeEvent } from '../src/protocol.js';
 
 const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6WbEAAAAASUVORK5CYII=';
 const url = 'data:image/png;base64,' + png;
@@ -76,6 +77,43 @@ test('image input rejection produces a failed response without claiming a turn',
   assert.equal(events[0].type, 'response.failed');
   assert.equal(bridge.pendingCount, 0);
   assert.ok(!JSON.stringify(events).includes('evil.example'));
+});
+
+test('native research keeps host web tools outside required client callbacks', async () => {
+  const bridge = new WidgetBridge(0);
+  const controller = new AbortController();
+  const events: BridgeEvent[] = [];
+  const instructions = 'Use host read-only web search and open public catalogs for dimensions, then submit the structured result.';
+  const result = { notes: ['Host web tools unavailable; dimensions unverified.'] };
+  const completion = (async () => {
+    for await (const event of bridge.respond({ model: 'chatgpt-web', instructions, input: [photo()], stream: false,
+      tools: [{ type: 'function', name: 'submit_poc_result', parameters: { type: 'object', additionalProperties: false,
+        required: ['notes'], properties: { notes: { type: 'array', items: { type: 'string' } } } } }],
+      tool_choice: 'required' }, controller.signal)) events.push(event);
+  })();
+  try {
+    for (let i = 0; !bridge.pendingCount && i < 500; i++) await new Promise(resolve => setTimeout(resolve, 10));
+    const widgetId = randomUUID();
+    const turn = bridge.claim('bridge-v21', widgetId); assert.ok(turn);
+    bridge.leasedStatus(turn.request_id, widgetId, turn.claim_lease_id!, 'send_started');
+    const prompt = bridge.readRequest(turn.request_id); assert.ok(prompt);
+    assert.ok(prompt.includes(instructions));
+    assert.match(prompt, /Only when the current client's instructions explicitly authorize public web research/);
+    assert.match(prompt, /These host web tools are not client-owned callback functions/);
+    assert.doesNotMatch(prompt, /only use workbench_api_submit/);
+    assert.ok(!prompt.includes(png));
+    assert.equal(await bridge.submit(turn.request_id, { toolCalls: [{ name: 'web_search', arguments: { query: 'TEST catalog' } }] }), 'invalid_result');
+    assert.equal(await bridge.submit(turn.request_id, { text: 'Cannot replace the required result callback' }), 'invalid_result');
+    assert.equal(bridge.isPending(turn.request_id), true);
+    assert.equal(await bridge.submit(turn.request_id, { toolCalls: [{ name: 'submit_poc_result', arguments: result }] }), 'accepted');
+    await completion;
+    const completed = events.find(event => event.type === 'response.completed');
+    assert.ok(completed && completed.type === 'response.completed');
+    const output = completed.response.output; assert.ok(Array.isArray(output));
+    assert.equal(output[0].type, 'function_call');
+    assert.deepEqual(JSON.parse(output[0].arguments), result);
+    assert.equal(bridge.readRequestImage(turn.request_id), null);
+  } finally { controller.abort(); bridge.shutdown(); await completion; }
 });
 
 test('real local MCP returns native image blocks by index and revokes them after cancellation', async () => {
