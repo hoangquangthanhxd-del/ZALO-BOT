@@ -112,7 +112,7 @@ export function buildServer(bridge: ChatGPTBridge = new UnconfiguredBridge(), br
     if (audit) { audit.markInferenceStarted(); audit.provider = alias?.provider ?? null; audit.upstreamModel = upstream.model; }
     if (provider && provider.type !== "coworker-widget") {
       let key: string | undefined;
-      try { key = localStore?.providerKey(provider.id); } catch {}
+      try { key = localStore?.providerKey(provider.id); } catch { /* Missing/unreadable credentials follow the provider_unavailable path below. */ }
       if (!key) { if (audit) audit.outcome = "failed"; yield { type: "response.failed", error: { code: "provider_unavailable", message: "Provider credential is unavailable." } }; return; }
       selectedBridge = provider.type === "anthropic" ? new AnthropicProviderBridge(provider, key, wireBodies.get(context) ?? {}) : provider.wireApi === "chat-completions"
         ? new ChatProviderBridge(provider, key, wireBodies.get(context) ?? {})
@@ -176,7 +176,7 @@ export function buildServer(bridge: ChatGPTBridge = new UnconfiguredBridge(), br
   if (bridge instanceof CoworkerBridge) {
     app.register(async (scope) => {
       await scope.register(websocket);
-      scope.get("/internal/bridge", { websocket: true }, (socket: any, request: any) => {
+      scope.get("/internal/bridge", { websocket: true }, (socket, request) => {
         const authorization = request.headers.authorization;
         if (!bridgeSecret || authorization !== `Bearer ${bridgeSecret}`) {
           socket.close(1008, "unauthorized");

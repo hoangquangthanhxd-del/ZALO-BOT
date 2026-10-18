@@ -42,14 +42,14 @@ Deployment and a real model/widget acceptance probe remain separate operations.
   failed because the separated validator factory did not exist. The delayed
   bootstrap regression keeps a 20 ms execution budget while trusted startup
   takes 60 ms; real workers still reject remote references and wrong arguments.
-- Direct ESLint checks PASS for the new validator, baseline and startup tests.
-  Checking the changed `app.ts` also reports three inherited lint errors
-  (`no-empty`, two `no-explicit-any`); the exact `origin/main` file reproduces
-  the same three findings. They are outside the changed request hook. No lint
-  rule or CI workflow was disabled. The local pre-commit hook requires `bunx`,
-  which is not installed; these direct checks and the copied application build/
-  tests were run instead. This does not turn the inherited lint failures into
-  PASS and is not evidence for merging or deploying with unresolved gates.
+- Initial direct ESLint found three inherited errors in `app.ts` (`no-empty`,
+  two `no-explicit-any`), reproduced on the exact baseline. The continuation
+  documents the credential catch and uses the WebSocket handler's inferred
+  types. Direct ESLint now PASS for all four changed TypeScript files. The full
+  copied application build and **185 tests PASS again** after these two edits;
+  initial failed checks remain recorded. No lint rule or CI workflow was
+  disabled. The local pre-commit hook requires unavailable `bunx`; the direct
+  checks and copied application tests were run instead.
 - A tiny valid tool schema was rejected by the running gateway with HTTP 400
   `tool_schema_timeout`. Later invalid-message probes with valid ROUTE/NOTES/
   FINAL schemas passed schema validation in 206–268 ms and stopped at the
@@ -69,4 +69,7 @@ selection, permissions, scheduled task or Production process was changed.
   contains the provider categories, routing deadline, date checks and image
   guidance. Its CI run `39098498628` reports FAILURE because account billing/
   spending limits prevented jobs from starting, not an executed test result.
+- After the user's DeepSeek top-up, the synthetic today-order route passed in
+  3298 ms with `DEEPSEEK_PRO`, without fallback. The client trace identifies a
+  real accepted DeepSeek inference; top-up does not deploy this gateway patch.
 - No merge SHA or post-deployment acceptance result exists for this task.
