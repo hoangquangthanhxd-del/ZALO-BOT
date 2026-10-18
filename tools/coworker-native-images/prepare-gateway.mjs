@@ -7,7 +7,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const source = process.argv[2] || 'C:/Users/Admin/AppData/Local/coworkerapi/app';
 const destination = join(root, '.cache/coworker-native-app');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
-for (const file of ['widget-bridge.ts', 'widget-mcp.ts', 'widget-host-bridge.ts', 'app.ts']) {
+for (const file of ['widget-bridge.ts', 'widget-mcp.ts', 'widget-host-bridge.ts', 'app.ts', 'tool-schema.ts']) {
   const baseline = await readFile(new URL('./baseline/' + file, import.meta.url));
   const installed = await readFile(join(source, 'src', file));
   if (hash(baseline) !== hash(installed)) throw new Error('GATEWAY_BASELINE_CHANGED: re-audit source before applying the POC.');
@@ -34,10 +34,10 @@ catch (error) {
   if (error.code !== 'ENOENT') throw error;
   await symlink(join(source, 'node_modules'), join(destination, 'node_modules'), 'junction');
 }
-for (const file of ['widget-bridge.ts', 'widget-mcp.ts', 'widget-images.ts', 'widget-native-files.ts', 'widget-host-bridge.ts', 'app.ts']) {
+for (const file of ['widget-bridge.ts', 'widget-mcp.ts', 'widget-images.ts', 'widget-native-files.ts', 'widget-host-bridge.ts', 'app.ts', 'tool-schema.ts']) {
   await copyFile(new URL('./gateway-src/' + file, import.meta.url), join(destination, 'src', file));
 }
-for (const file of ['widget-native-images.test.ts', 'widget-native-files.test.ts', 'widget-runtime.test.ts', 'widget-chat-policy-mcp.test.ts', 'widget-host-bridge.test.ts', 'widget-mcp.test.ts']) {
+for (const file of ['widget-native-images.test.ts', 'widget-native-files.test.ts', 'widget-runtime.test.ts', 'widget-chat-policy-mcp.test.ts', 'widget-host-bridge.test.ts', 'widget-mcp.test.ts', 'tool-schema-startup.test.ts']) {
   await copyFile(new URL('./tests/' + file, import.meta.url), join(destination, 'tests', file));
 }
 console.log(JSON.stringify({ status: 'POC_SOURCE_PREPARED', destination, installedGatewayModified: false }));

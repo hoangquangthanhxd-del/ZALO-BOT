@@ -1,2 +1,4 @@
 # Baseline byte hashes and embedded widget source require stable line endings.
 tools/coworker-native-images/** text eol=lf
+# This installed baseline has CRLF bytes; its audit must survive Git checkout.
+tools/coworker-native-images/baseline/tool-schema.ts -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
