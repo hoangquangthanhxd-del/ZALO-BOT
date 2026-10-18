@@ -91,7 +91,10 @@ export function buildServer(bridge: ChatGPTBridge = new UnconfiguredBridge(), br
     if (request.method !== "POST" || !modelPaths.has(request.url.split("?")[0]) || !authenticate(request)) return;
     const body = request.body as Record<string, unknown> | undefined;
     if (!body || typeof body.model !== "string" || !usesWidget(body.model) || (body.tools !== undefined && !Array.isArray(body.tools))) return;
-    const error = (code: string, message: string) => reply.code(code === "tool_schema_capacity" ? 503 : 400).send({ ...(request.url.startsWith("/v1/messages") ? { type: "error" } : {}), error: { type: code === "tool_schema_capacity" ? "server_error" : "invalid_request_error", code, message } });
+    const error = (code: string, message: string) => {
+      const unavailable = ["tool_schema_capacity", "tool_schema_unavailable"].includes(code);
+      return reply.code(unavailable ? 503 : 400).send({ ...(request.url.startsWith("/v1/messages") ? { type: "error" } : {}), error: { type: unavailable ? "server_error" : "invalid_request_error", code, message } });
+    };
     if (!request.url.startsWith("/v1/responses") && (body.tools as unknown[] | undefined)?.some(tool => tool && typeof tool === "object" && (tool as Record<string, unknown>).type === "namespace")) return error("unsupported_tools", "Function namespaces require the Responses endpoint.");
     try { await validateWidgetToolSchemas(widgetToolPolicy(body.tools as unknown[] | undefined, body.tool_choice, body.parallel_tool_calls)); }
     catch (cause) { return error(cause instanceof WidgetToolPolicyError ? cause.code : "invalid_tools", cause instanceof WidgetToolPolicyError ? cause.message : "Invalid client tool definitions."); }
