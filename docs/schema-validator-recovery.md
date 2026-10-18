@@ -59,3 +59,14 @@ Deployment and a real model/widget acceptance probe remain separate operations.
 
 No installed source, active gateway, configuration, credentials, worker
 selection, permissions, scheduled task or Production process was changed.
+
+## Handoff
+
+- Gateway [PR #4](https://github.com/hoangquangthanhxd-del/ZALO-BOT/pull/4), source
+  commit `c4a5675`, is open and not merged. No hosted check/run was created when
+  inspected; local tests are not reported as hosted CI PASS.
+- Client [PR #277](https://github.com/hoangquangthanhxd-del/PTAP-NEXT/pull/277)
+  contains the provider categories, routing deadline, date checks and image
+  guidance. Its CI run `39098498628` reports FAILURE because account billing/
+  spending limits prevented jobs from starting, not an executed test result.
+- No merge SHA or post-deployment acceptance result exists for this task.
